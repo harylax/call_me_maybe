@@ -1,10 +1,46 @@
 from llm_sdk.llm_sdk import Small_LLM_Model
+import json
+from typing import Any
+
+
+def functions_definition() -> str:
+    content: list[dict[str, Any]] = []
+    with open('data/input/functions_definition.json') as f:
+        content = json.load(f)
+    res: list[str] = []
+    for df in content:
+        params_dict: dict[str, str] = {}
+        for param, type in df['parameters'].items():
+            params_dict[param] = type['type']
+        params_str: str = ', '.join(
+            f"{key}: {value}"
+            for key, value
+            in params_dict.items()
+            )
+        res.append(
+            f" - function name: {df['name']}, "
+            f"parameter(s): {params_str}, "
+            f"description: {df['description']}"
+            )
+    return '\n'.join(fn for fn in res)
+
+
+def build_function_calling_prompt(prompt: str) -> str:
+    return (
+        "You are a function calling assistant...\n\n"
+        f"Available functions:\n{functions_definition()}\n\n"
+        f"User question: {prompt}\n"
+        "Function to call: "
+    )
+
 
 def main() -> None:
     llm: Small_LLM_Model = Small_LLM_Model()
-    prompt: str = "What is the sum of 265 and 345?"
+    user_prompt: str = "What is the sum of 265 and 345?"
 
-    input_ids: list[int] = llm.encode(prompt)[0].tolist()
+    full_prompt: str = build_function_calling_prompt(user_prompt)
+
+    input_ids: list[int] = llm.encode(full_prompt)[0].tolist()
     targets: list[str] = [
         "fn_substitute_string_with_regex", "fn_get_square_root",
         "fn_reverse_string", "fn_greet", "fn_add_numbers"
