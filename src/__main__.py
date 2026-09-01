@@ -5,10 +5,18 @@ def main() -> None:
     prompt: str = "What is the sum of 265 and 345?"
 
     input_ids: list[int] = llm.encode(prompt)[0].tolist()
-    target: str = "fn_add_numbers"
+    targets: list[str] = [
+        "fn_substitute_string_with_regex", "fn_get_square_root",
+        "fn_reverse_string", "fn_greet", "fn_add_numbers"
+        ]
     tokens: str = ""
-    while tokens != target:
-        left_to_find: str = target[len(tokens):]
+    while tokens not in targets:
+        left_to_find_options: list[str] = []
+        for target in targets:
+            if target.startswith(tokens):
+                left_to_find: str = target[len(tokens):]
+                left_to_find_options.append(left_to_find)
+
         logits: list[float] = llm.get_logits_from_input_ids(input_ids)
 
         for i in range(len(logits)):
@@ -17,7 +25,11 @@ def main() -> None:
             if not token_str:
                 logits[token_id] = float("-inf")
                 continue
-            if not left_to_find.startswith(token_str):
+            if not any(
+                left_to_find.startswith(token_str)
+                for left_to_find
+                in left_to_find_options
+            ):
                 logits[token_id] = float("-inf")
 
         best_logit: float = max(logits)
@@ -27,6 +39,7 @@ def main() -> None:
         tokens += best_token
 
     print(tokens)
+
 
 if __name__ == "__main__":
     main()

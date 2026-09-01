@@ -1,15 +1,15 @@
-# export HF_HOME=/goinfre/haryandr/hf_cache
-# export UV_PROJECT_ENVIRONMENT=/goinfre/haryandr/.venv
-# export UV_CACHE_DIR=/goinfre/haryandr/uv_cache
-export HF_HOME=/sgoinfre/haryandr/hf_cache
-export UV_PROJECT_ENVIRONMENT=/sgoinfre/haryandr/.venv
-export UV_CACHE_DIR=/sgoinfre/haryandr/uv_cache
+# export HF_HOME=/goinfre/$(USER)/hf_cache
+# export UV_PROJECT_ENVIRONMENT=/goinfre/$(USER)/.venv
+# export UV_CACHE_DIR=/goinfre/$(USER)/uv_cache
+export HF_HOME=/sgoinfre/$(USER)/hf_cache
+export UV_PROJECT_ENVIRONMENT=/sgoinfre/$(USER)/.venv
+export UV_CACHE_DIR=/sgoinfre/$(USER)/uv_cache
 
 .PHONY: install run clean
 
 
-$(UV_PROJECT_ENVIRONMENT)/.installed:
-	mkdir $(HF_HOME) $(UV_PROJECT_ENVIRONMENT) $(UV_CACHE_DIR)
+$(UV_PROJECT_ENVIRONMENT)/.installed: pyproject.toml uv.lock
+	mkdir -p $(HF_HOME) $(UV_CACHE_DIR)
 	uv sync
 	touch $(UV_PROJECT_ENVIRONMENT)/.installed
 
