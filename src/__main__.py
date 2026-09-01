@@ -29,7 +29,7 @@ def parse_functions_definition(path: str) -> list[Function]:
     return res
 
 
-def functions_definition(functions: list[Function]) -> str:
+def _functions_definition(functions: list[Function]) -> str:
     res: list[str] = []
     for func in functions:
         params_str: str = ', '.join(
@@ -51,13 +51,31 @@ def build_function_calling_prompt(
         ) -> str:
     return (
         "You are a function calling assistant...\n\n"
-        f"Available functions:\n{functions_definition(functions)}\n\n"
+        f"Available functions:\n{_functions_definition(functions)}\n\n"
         f"User question: {prompt}\n"
         "Function to call: "
     )
 
 
-def _get_vocab(llm: Small_LLM_Model) -> dict[str, int]:
+def build_params_prompt(
+        prompt: str,
+        function_name: str,
+        params: dict[str, str]
+        ) -> str:
+    params_str: str = ', '.join(
+        f"parameter '{key}' (type: {value})"
+        for key, value
+        in params.items()
+        )
+    return (
+        f"User question: {prompt}\n"
+        f"Function called: {function_name}\n"
+        f"Extract the value of: {params_str}\n"
+        "Parameter(s) value(s):\n"
+    )
+
+
+def get_vocab(llm: Small_LLM_Model) -> dict[str, int]:
     with open(llm.get_path_to_vocab_file()) as f:
         return json.load(f)
 
@@ -66,57 +84,122 @@ def get_inverted_vocab(llm: Small_LLM_Model) -> dict[int, str]:
     return {
         value: key.replace('Ġ', ' ')
         for key, value
-        in _get_vocab(llm).items()
+        in get_vocab(llm).items()
         }
 
 
-def main() -> None:
-    llm: Small_LLM_Model = Small_LLM_Model()
-    vocab: dict[int, str] = get_inverted_vocab(llm)
-
-    path_to_functions_definition: str = 'data/input/functions_definition.json'
-    functions: list[Function] = parse_functions_definition(
-        path_to_functions_definition
-        )
-    user_prompt: str = "What is the sum of 265 and 345?"
-
+def function_name_from_llm(
+        user_prompt: str,
+        llm: Small_LLM_Model,
+        inv_vocab: dict[int, str],
+        functions: list[Function]
+        ) -> str:
     full_prompt: str = build_function_calling_prompt(
-        user_prompt,
-        functions
-        )
-
-    input_ids: list[int] = llm.encode(full_prompt)[0].tolist()
+        user_prompt, functions
+    )
     targets: list[str] = [func.name for func in functions]
-    tokens: str = ""
+    input_ids: list[int] = llm.encode(full_prompt)[0].tolist()
+    tokens: str = ''
     while tokens not in targets:
         left_to_find_options: list[str] = []
         for target in targets:
             if target.startswith(tokens):
                 left_to_find: str = target[len(tokens):]
                 left_to_find_options.append(left_to_find)
-
         logits: list[float] = llm.get_logits_from_input_ids(input_ids)
-
-        for i in range(len(logits)):
-            token_id: int = i
-            token_str: str = vocab.get(token_id, '')
+        for token_id in range(len(logits)):
+            token_str: str = inv_vocab.get(token_id, '')
             if not token_str:
-                logits[token_id] = float("-inf")
-                continue
+                logits[token_id] = float('-inf')
             if not any(
                 left_to_find.startswith(token_str)
                 for left_to_find
                 in left_to_find_options
             ):
-                logits[token_id] = float("-inf")
-
+                logits[token_id] = float('-inf')
         best_logit: float = max(logits)
         best_id: int = logits.index(best_logit)
-        best_token: str = llm.decode([best_id])
+        best_token: str = inv_vocab[best_id]
         input_ids.append(best_id)
         tokens += best_token
+    return tokens
 
-    print(tokens)
+
+def params_from_llm(
+        user_prompt: str,
+        llm: Small_LLM_Model,
+        vocab: dict[str, int],
+        inv_vocab: dict[int, str],
+        function: Function
+        ) -> dict[str, str]:
+    full_prompt: str = build_params_prompt(
+        user_prompt, function.name, function.params
+    )
+    input_ids: list[int] = llm.encode(full_prompt)[0].tolist()
+    res: dict[str, str] = {}
+    for param, type in function.params.items():
+        add_str: str = f"\n\"{param}\" (type: {type}): "
+        add_token_ids: list[int] = llm.encode(add_str)[0].tolist()
+        for id in add_token_ids:
+            input_ids.append(id)
+        if type == 'string':
+            input_ids.append(vocab['"'])
+            tokens: str = ''
+            while not tokens.endswith('"'):
+                logits: list[float] = llm.get_logits_from_input_ids(input_ids)
+                for token_id in range(len(logits)):
+                    token_str: str = inv_vocab.get(token_id, '')
+                    if not token_str:
+                        logits[token_id] = float('-inf')
+                        continue
+                    if '"' in token_str:
+                        if not token_str.endswith('"'):
+                            logits[token_id] = float('-inf')
+                best_logit: float = max(logits)
+                best_id: int = logits.index(best_logit)
+                best_token: str = inv_vocab[best_id]
+                input_ids.append(best_id)
+                tokens += best_token
+            res[param] = tokens.rstrip('"')
+        elif type == 'number':
+            ...
+    return res
+
+
+def get_function(function_name: str, functions: list[Function]) -> Function:
+    for fn in functions:
+        if fn.name == function_name:
+            return fn
+    raise ValueError(f"'{function_name}' not found in definitions")
+
+
+def main() -> None:
+    llm: Small_LLM_Model = Small_LLM_Model()
+    vocab: dict[str, int] = get_vocab(llm)
+    inv_vocab: dict[int, str] = get_inverted_vocab(llm)
+
+    path_to_functions_definition: str = 'data/input/functions_definition.json'
+    functions: list[Function] = parse_functions_definition(
+        path_to_functions_definition
+        )
+    user_prompt: str = "Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat'"
+
+    llm_fn_name: str = function_name_from_llm(
+        user_prompt, llm, inv_vocab, functions
+        )
+
+    try:
+        function: Function = get_function(llm_fn_name, functions)
+    except ValueError as err:
+        print(f"Value Error: {err}")
+        exit(1)
+
+    llm_params: dict[str, str] = params_from_llm(
+        user_prompt, llm, vocab, inv_vocab, function
+    )
+
+    print(llm_fn_name)
+    print(llm_params)
 
 
 if __name__ == "__main__":
