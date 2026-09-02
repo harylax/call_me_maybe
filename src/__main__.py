@@ -208,9 +208,17 @@ def get_function(function_name: str, functions: list[Function]) -> Function:
             return fn
     raise ValueError(f"'{function_name}' not found in definitions")
 
+def parse_prompts(path: str) -> list[str]:
+    content: list[dict[str, str]] = []
+    with open(path) as f:
+        content = json.load(f)
+    return [prompt['prompt'] for prompt in content]
 
 def main() -> None:
     llm: Small_LLM_Model = Small_LLM_Model()
+
+    output: list[dict[str, Any]] = []
+
     vocab: dict[str, int] = get_vocab(llm)
     inv_vocab: dict[int, str] = get_inverted_vocab(llm)
 
@@ -218,25 +226,34 @@ def main() -> None:
     functions: list[Function] = parse_functions_definition(
         path_to_functions_definition
         )
-    user_prompt: str = "What is the square root of 16?"
 
-    llm_fn_name: str = function_name_from_llm(
-        user_prompt, llm, inv_vocab, functions
+    for user_prompt in parse_prompts('data/input/function_calling_tests.json'):
+        llm_fn_name: str = function_name_from_llm(
+            user_prompt, llm, inv_vocab, functions
+            )
+
+        try:
+            function: Function = get_function(llm_fn_name, functions)
+        except ValueError as err:
+            print(f"Value Error: {err}")
+            raise SystemExit()
+
+        llm_params: dict[str, str | int | float] = params_from_llm(
+            user_prompt, llm, vocab, inv_vocab, function
         )
 
-    try:
-        function: Function = get_function(llm_fn_name, functions)
-    except ValueError as err:
-        print(f"Value Error: {err}")
-        raise SystemExit()
-
-    llm_params: dict[str, str | int | float] = params_from_llm(
-        user_prompt, llm, vocab, inv_vocab, function
-    )
-
-    print(llm_fn_name)
-    print(llm_params)
-
+        output.append({
+            'prompt': user_prompt,
+            'name': llm_fn_name,
+            'parameters': llm_params
+        })
+        # print(f"prompt: {user_prompt}")
+        # print(f"name: {llm_fn_name}")
+        # print(f"parameters: {llm_params}")
+    import os
+    os.makedirs('data/output')
+    with open('data/output/function_calling_results.json', 'w') as f:
+        json.dump(output, f, indent=2)
 
 if __name__ == "__main__":
     main()
