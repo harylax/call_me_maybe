@@ -111,6 +111,7 @@ def function_name_from_llm(
             token_str: str = inv_vocab.get(token_id, '')
             if not token_str:
                 logits[token_id] = float('-inf')
+                continue
             if not any(
                 left_to_find.startswith(token_str)
                 for left_to_find
@@ -162,7 +163,38 @@ def params_from_llm(
                 tokens += best_token
             res[param] = tokens.rstrip('"')
         elif type == 'number':
-            ...
+            input_ids.append(vocab["'"])
+            tokens = ''
+            while not tokens.endswith("'"):
+                logits: list[float] = llm.get_logits_from_input_ids(input_ids)
+                for token_id in range(len(logits)):
+                    token_str = inv_vocab.get(token_id, '')
+                    if not token_str:
+                        logits[token_id] = float('-inf')
+                        continue
+                    if token_str[0] in ['-', '+']:
+                        if tokens != '':
+                            logits[token_id] = float('-inf')
+                            continue
+                    if '.' in token_str:
+                        if tokens == '':
+                            logits[token_id] = float('-inf')
+                            continue
+                        if '.' in tokens:
+                            logits[token_id] = float('-inf')
+                            continue
+                    if "'" in token_str:
+                        if not token_str.endswith("'"):
+                            logits[token_id] = float('-inf')
+                            continue
+                    if not all(c in "0123456789+-.'" for c in token_str):
+                        logits[token_id] = float('-inf')
+                best_logit = max(logits)
+                best_id = logits.index(best_logit)
+                best_token = inv_vocab[best_id]
+                input_ids.append(best_id)
+                tokens += best_token
+            res[param] = tokens.rstrip("'")
     return res
 
 
@@ -182,7 +214,7 @@ def main() -> None:
     functions: list[Function] = parse_functions_definition(
         path_to_functions_definition
         )
-    user_prompt: str = "Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat'"
+    user_prompt: str = "What is the sum of 265 and 345?"
 
     llm_fn_name: str = function_name_from_llm(
         user_prompt, llm, inv_vocab, functions
@@ -192,7 +224,7 @@ def main() -> None:
         function: Function = get_function(llm_fn_name, functions)
     except ValueError as err:
         print(f"Value Error: {err}")
-        exit(1)
+        raise SystemExit()
 
     llm_params: dict[str, str] = params_from_llm(
         user_prompt, llm, vocab, inv_vocab, function
