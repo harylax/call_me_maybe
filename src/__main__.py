@@ -132,12 +132,12 @@ def params_from_llm(
         vocab: dict[str, int],
         inv_vocab: dict[int, str],
         function: Function
-        ) -> dict[str, str]:
+        ) -> dict[str, str | int | float]:
     full_prompt: str = build_params_prompt(
         user_prompt, function.name, function.params
     )
     input_ids: list[int] = llm.encode(full_prompt)[0].tolist()
-    res: dict[str, str] = {}
+    res: dict[str, str | int | float] = {}
     for param, type in function.params.items():
         add_str: str = f"\n\"{param}\" (type: {type}): "
         add_token_ids: list[int] = llm.encode(add_str)[0].tolist()
@@ -166,7 +166,7 @@ def params_from_llm(
             input_ids.append(vocab["'"])
             tokens = ''
             while not tokens.endswith("'"):
-                logits: list[float] = llm.get_logits_from_input_ids(input_ids)
+                logits = llm.get_logits_from_input_ids(input_ids)
                 for token_id in range(len(logits)):
                     token_str = inv_vocab.get(token_id, '')
                     if not token_str:
@@ -194,7 +194,11 @@ def params_from_llm(
                 best_token = inv_vocab[best_id]
                 input_ids.append(best_id)
                 tokens += best_token
-            res[param] = tokens.rstrip("'")
+            if '.' in tokens:
+                res[param] = float(tokens.rstrip("'"))
+            else:
+                res[param] = int(tokens.rstrip("'"))
+
     return res
 
 
@@ -214,7 +218,7 @@ def main() -> None:
     functions: list[Function] = parse_functions_definition(
         path_to_functions_definition
         )
-    user_prompt: str = "What is the sum of 265 and 345?"
+    user_prompt: str = "What is the square root of 16?"
 
     llm_fn_name: str = function_name_from_llm(
         user_prompt, llm, inv_vocab, functions
@@ -226,7 +230,7 @@ def main() -> None:
         print(f"Value Error: {err}")
         raise SystemExit()
 
-    llm_params: dict[str, str] = params_from_llm(
+    llm_params: dict[str, str | int | float] = params_from_llm(
         user_prompt, llm, vocab, inv_vocab, function
     )
 
