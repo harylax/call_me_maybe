@@ -1,9 +1,11 @@
-export HF_HOME=/goinfre/$(USER)/hf_cache
-export UV_PROJECT_ENVIRONMENT=/goinfre/$(USER)/.venv
-export UV_CACHE_DIR=/goinfre/$(USER)/uv_cache
+# export HF_HOME=/goinfre/$(USER)/hf_cache
+# export UV_PROJECT_ENVIRONMENT=/goinfre/$(USER)/.venv
+# export UV_CACHE_DIR=/goinfre/$(USER)/uv_cache
 # export HF_HOME=/sgoinfre/$(USER)/hf_cache
 # export UV_PROJECT_ENVIRONMENT=/sgoinfre/$(USER)/.venv
 # export UV_CACHE_DIR=/sgoinfre/$(USER)/uv_cache
+export HF_HOME=../hf_cache
+export UV_CACHE_DIR=../uv_cache
 
 .PHONY: install run clean
 

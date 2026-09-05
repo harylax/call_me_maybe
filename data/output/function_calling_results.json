@@ -3,8 +3,8 @@
     "prompt": "What is the sum of 2 and 3?",
     "name": "fn_add_numbers",
     "parameters": {
-      "a": 3.0,
-      "b": 2.0
+      "a": 2.0,
+      "b": 3.0
     }
   },
   {
@@ -26,7 +26,7 @@
     "prompt": "Greet john",
     "name": "fn_greet",
     "parameters": {
-      "name": "John Doe"
+      "name": "john"
     }
   },
   {
@@ -62,7 +62,7 @@
     "name": "fn_substitute_string_with_regex",
     "parameters": {
       "source_string": "Hello 34 I'm 233 years old",
-      "regex": "(\\d{1,3})",
+      "regex": "(\\d+)",
       "replacement": "NUMBERS"
     }
   },
@@ -80,7 +80,7 @@
     "name": "fn_substitute_string_with_regex",
     "parameters": {
       "source_string": "The cat sat on the mat with another cat",
-      "regex": "cat",
+      "regex": "cat$cat$cat$cat$cat$cat$cat$cat$cat$cat$cat$cat$cat",
       "replacement": "dog"
     }
   }
