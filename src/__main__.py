@@ -1,7 +1,9 @@
-from llm_sdk.llm_sdk import Small_LLM_Model
+from llm_sdk.llm_sdk import Small_LLM_Model  # type: ignore
 import json
 from typing import Any
-from pydantic import BaseModel
+from pydantic import BaseModel  # type: ignore
+from collections.abc import Callable
+import time
 
 
 class Function(BaseModel):
@@ -68,18 +70,16 @@ def build_params_prompt(
         in function.params.items()
         )
     return (
-        f"User main prompt: {prompt}\n"
+        "You are a parameters extractor assistant...\n\n"
         f"Function called: {_functions_definition([function])}\n"
-        f"Extract the value of the following parameters: {params_str}.\n"
-        # "Don't add extra informations.\n"
-        # "If the value to be extracted is part of the user main prompt: just exract the value, don't add extra informations.\n"
-        # "Preserve uppercase and lowercase.\n"
-        # "Preserve spelling, capitalisation, uppercase, lowercase, "
-        # "mixed case, numbers in the user main prompt.\n"
-        # "Don't correct user's mistakes.\n"
-        # "As reminder, vowels are: 'aeiouAEIOU' "
-        # "and numbers are: '0123456789'.\n"
-        "Parameter(s) value(s):\n"
+        f"User main prompt: {prompt}\n"
+        f"Extract the value of: {params_str}.\n"
+        "Don't add extra informations.\n"
+        "Avoid repetition of tokens unless necessary.\n"
+        "Preserve spelling, capitalisation, uppercase, lowercase, "
+        "mixed case, numbers in the user main prompt.\n"
+        "As reminder, vowels are: 'aeiouAEIOU'.\n"
+        "Parameter(s) value(s) extraction:\n"
     )
 
 
@@ -152,21 +152,23 @@ def params_from_llm(
     )
     input_ids: list[int] = llm.encode(full_prompt)[0].tolist()
     res: dict[str, str | int | float] = {}
-    for param, type in function.params.items():
+    for i, (param, type) in enumerate(function.params.items()):
         add_str: str = (
-            f"\nkey=\"{param}\" (type: {type})\n"
-            "value="
+            f"\nThe parameter number {i} is "
+            f"\"{param}\" and its type '{type}'\n"
+            f"\n{param}="
             )
         add_token_ids: list[int] = llm.encode(add_str)[0].tolist()
         input_ids.extend(add_token_ids)
-        # for id in add_token_ids:
-        #     input_ids.append(id)
         if type == 'string':
             input_ids.append(vocab['"'])
             tokens: str = ''
+            seen: dict[int, int] = {}
             while not tokens.endswith('"'):
                 logits: list[float] = llm.get_logits_from_input_ids(input_ids)
                 for token_id in range(len(logits)):
+                    if token_id in seen:
+                        logits[token_id] -= 2.0 * seen[token_id]
                     token_str: str = inv_vocab.get(token_id, '')
                     if not token_str:
                         logits[token_id] = float('-inf')
@@ -179,6 +181,10 @@ def params_from_llm(
                 best_token: str = inv_vocab[best_id]
                 input_ids.append(best_id)
                 tokens += best_token
+                if best_id in seen:
+                    seen[best_id] += 1
+                else:
+                    seen[best_id] = 1
                 if len(tokens) > 50:
                     break
             res[param] = tokens.rstrip('"')
@@ -282,8 +288,7 @@ def parse_args() -> tuple[str, str, str]:
     args = parser.parse_args()
     return args.input, args.functions_definition, args.output
 
-from collections.abc import Callable
-import time
+
 def timer(func: Callable) -> Callable:
     def wrapper(*args: Any, **kwargs: Any) -> None:
         start: float = time.perf_counter()
@@ -294,8 +299,9 @@ def timer(func: Callable) -> Callable:
         print(f"Run completed in {minutes} minutes and {seconds} seconds")
     return wrapper
 
+
 @timer
-def run() -> None:
+def main() -> None:
     llm: Small_LLM_Model = Small_LLM_Model()
 
     input_path, functions_definition_path, output_path = parse_args()
@@ -310,7 +316,6 @@ def run() -> None:
         )
 
     for user_prompt in parse_prompts(input_path):
-    # for user_prompt in ["Greet shrek"]:
         llm_fn_name: str = function_name_from_llm(
             user_prompt, llm, inv_vocab, functions
             )
@@ -340,51 +345,5 @@ def run() -> None:
         json.dump(output, f, indent=2)
 
 
-# def main() -> None:
-#     llm: Small_LLM_Model = Small_LLM_Model()
-
-#     input_path, functions_definition_path, output_path = parse_args()
-
-#     output: list[dict[str, Any]] = []
-
-#     vocab: dict[str, int] = get_vocab(llm)
-#     inv_vocab: dict[int, str] = get_inverted_vocab(llm)
-
-#     functions: list[Function] = parse_functions_definition(
-#         functions_definition_path
-#         )
-
-#     # for user_prompt in parse_prompts(input_path):
-#     for user_prompt in ["Greet shrek"]:
-#         llm_fn_name: str = function_name_from_llm(
-#             user_prompt, llm, inv_vocab, functions
-#             )
-
-#         try:
-#             function: Function = get_function(llm_fn_name, functions)
-#         except ValueError as err:
-#             print(f"Value Error: {err}")
-#             raise SystemExit()
-
-#         llm_params: dict[str, str | int | float] = params_from_llm(
-#             user_prompt, llm, vocab, inv_vocab, function
-#         )
-
-#         output.append({
-#             'prompt': user_prompt,
-#             'name': llm_fn_name,
-#             'parameters': llm_params
-#         })
-#         print(f"prompt: {user_prompt}")
-#         print(f"name: {llm_fn_name}")
-#         print(f"parameters: {llm_params}")
-#     from pathlib import Path
-#     path: Path = Path(output_path)
-#     path.parent.mkdir(parents=True, exist_ok=True)
-#     with open(output_path, 'w') as f:
-#         json.dump(output, f, indent=2)
-
-
 if __name__ == "__main__":
-    # main()
-    run()
+    main()
