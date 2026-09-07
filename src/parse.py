@@ -23,7 +23,7 @@ class Prompt(BaseModel):
 
     prompt: str
 
-def _json_load(path) -> list[dict[str, Any]]:
+def _json_load(path: str) -> list[dict[str, Any]]:
     try:
         with open(path) as f:
             return json.load(f)

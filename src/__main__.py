@@ -37,7 +37,7 @@ def main() -> None:
             print(f"Value Error: {err}")
             raise SystemExit()
 
-        llm_params: dict[str, str | int | float] = params_from_llm(
+        llm_params: dict[str, str | int | float | bool] = params_from_llm(
             user_prompt, llm, vocab, inv_vocab, function
         )
 
