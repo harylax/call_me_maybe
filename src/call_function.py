@@ -1,11 +1,11 @@
-from src import Small_LLM_Model, Function, build_function_calling_prompt
+from src import Small_LLM_Model, FunctionDef, Prompt, build_function_calling_prompt
 
 
 def function_name_from_llm(
-        user_prompt: str,
+        user_prompt: Prompt,
         llm: Small_LLM_Model,
         inv_vocab: dict[int, str],
-        functions: list[Function]
+        functions: list[FunctionDef]
         ) -> str:
     full_prompt: str = build_function_calling_prompt(
         user_prompt, functions

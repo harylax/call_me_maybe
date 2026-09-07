@@ -3,8 +3,9 @@ import json
 from typing import Any
 from src import (
     timer, parse_args, get_vocab, get_inverted_vocab,
-    Function, parse_functions_definition, parse_prompts,
-    function_name_from_llm, params_from_llm, get_function
+    FunctionDef, parse_functions_definition, parse_prompts,
+    function_name_from_llm, params_from_llm, get_function,
+    Prompt
 )
 from pathlib import Path
 import sys
@@ -21,7 +22,7 @@ def main() -> None:
     vocab: dict[str, int] = get_vocab(llm)
     inv_vocab: dict[int, str] = get_inverted_vocab(llm)
 
-    functions: list[Function] = parse_functions_definition(
+    functions: list[FunctionDef] = parse_functions_definition(
         functions_definition_path
         )
 
@@ -31,7 +32,7 @@ def main() -> None:
             )
 
         try:
-            function: Function = get_function(llm_fn_name, functions)
+            function: FunctionDef = get_function(llm_fn_name, functions)
         except ValueError as err:
             print(f"Value Error: {err}")
             raise SystemExit()
@@ -41,11 +42,11 @@ def main() -> None:
         )
 
         output.append({
-            'prompt': user_prompt,
+            'prompt': user_prompt.prompt,
             'name': llm_fn_name,
             'parameters': llm_params
         })
-        print(f"prompt: {user_prompt}")
+        print(f"prompt: {user_prompt.prompt}")
         print(f"name: {llm_fn_name}")
         print(f"parameters: {llm_params}")
     path: Path = Path(output_path)

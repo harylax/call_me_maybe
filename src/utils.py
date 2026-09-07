@@ -1,6 +1,6 @@
 from src import Small_LLM_Model
 import json
-from src import Function
+from src import FunctionDef
 from collections.abc import Callable
 import time
 from functools import wraps
@@ -25,7 +25,7 @@ def get_inverted_vocab(llm: Small_LLM_Model) -> dict[int, str]:
         }
 
 
-def get_function(function_name: str, functions: list[Function]) -> Function:
+def get_function(function_name: str, functions: list[FunctionDef]) -> FunctionDef:
     for fn in functions:
         if fn.name == function_name:
             return fn

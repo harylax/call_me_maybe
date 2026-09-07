@@ -1,12 +1,12 @@
-from src import Small_LLM_Model, Function, build_params_prompt
+from src import Small_LLM_Model, FunctionDef, build_params_prompt, Prompt
 
 
 def params_from_llm(
-        user_prompt: str,
+        user_prompt: Prompt,
         llm: Small_LLM_Model,
         vocab: dict[str, int],
         inv_vocab: dict[int, str],
-        function: Function
+        function: FunctionDef
         ) -> dict[str, str | int | float]:
     full_prompt: str = build_params_prompt(
         user_prompt, function
@@ -41,15 +41,15 @@ def params_from_llm(
         if not all(c in "0123456789+-'" for c in token_str):
             invalid_integer.append(token_id)
 
-    for i, (param, type) in enumerate(function.params.items()):
+    for i, (param, param_def) in enumerate(function.parameters.items()):
         add_str: str = (
             f"\nThe parameter number {i} is "
-            f"\"{param}\" and its type '{type}'\n"
+            f"\"{param}\" and its type '{param_def.type}'\n"
             f"\n{param}="
             )
         add_token_ids: list[int] = llm.encode(add_str)[0].tolist()
         input_ids.extend(add_token_ids)
-        if type == 'string':
+        if param_def.type == 'string':
             input_ids.append(vocab['"'])
             tokens: str = ''
             seen: dict[int, int] = {}
@@ -74,7 +74,7 @@ def params_from_llm(
                 if len(tokens) > 50:
                     break
             res[param] = tokens.rstrip('"')
-        elif type == 'number':
+        elif param_def.type == 'number':
             input_ids.append(vocab["'"])
             tokens = ''
             while not tokens.endswith("'"):
@@ -99,7 +99,7 @@ def params_from_llm(
                 input_ids.append(best_id)
                 tokens += best_token
             res[param] = float(tokens.rstrip("'"))
-        elif type == 'integer':
+        elif param_def.type == 'integer':
             input_ids.append(vocab["'"])
             tokens = ''
             while not tokens.endswith("'"):
@@ -120,7 +120,7 @@ def params_from_llm(
                 input_ids.append(best_id)
                 tokens += best_token
             res[param] = int(tokens.rstrip("'"))
-        elif type == 'boolean':
+        elif param_def.type == 'boolean':
             true_id: int = vocab['true']
             false_id: int = vocab['false']
             logits = llm.get_logits_from_input_ids(input_ids)

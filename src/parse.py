@@ -1,16 +1,27 @@
-from pydantic import BaseModel  # type: ignore
+from pydantic import BaseModel, ConfigDict, ValidationError  # type: ignore
 import json
-from typing import Any
+from typing import Any, Literal
 import sys
 from argparse import ArgumentParser
 
 
-class Function(BaseModel):
-    name: str
-    params: dict[str, str]
-    descr: str
-    returns: str
+class ParamDef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
+    type: Literal["string", "number", "integer", "boolean"]
+
+class FunctionDef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    
+    name: str
+    description: str
+    parameters: dict[str, ParamDef]
+    returns: ParamDef
+
+class Prompt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    prompt: str
 
 def _json_load(path) -> list[dict[str, Any]]:
     try:
@@ -23,25 +34,27 @@ def _json_load(path) -> list[dict[str, Any]]:
         print(f"JSONDecodeError: {err}")
         sys.exit(1)
 
-
-def parse_functions_definition(path: str) -> list[Function]:
-    res: list[Function] = []
+def parse_functions_definition(path: str) -> list[FunctionDef]:
+    res: list[FunctionDef] = []
     for func in _json_load(path):
-        params_dict: dict[str, str] = {}
-        for param, type in func['parameters'].items():
-            params_dict[param] = type['type']
-        res.append(Function(
-            name=func['name'],
-            params=params_dict,
-            descr=func['description'],
-            returns=func['returns']['type']
-        ))
+        try:
+            res.append(FunctionDef.model_validate(func))
+        except ValidationError as err:
+            for error in err.errors():
+                print(f"ValidationError: {error['msg']}", file=sys.stderr)
+            sys.exit(1)
     return res
 
-
-def parse_prompts(path: str) -> list[str]:
-    return [prompt['prompt'] for prompt in _json_load(path)]
-
+def parse_prompts(path: str) -> list[Prompt]:
+    res: list[Prompt] = []
+    for prompt in _json_load(path):
+        try:
+            res.append(Prompt.model_validate(prompt))
+        except ValidationError as err:
+            for error in err.errors():
+                print(f"ValidationError: {error['msg']}", file=sys.stderr)
+            sys.exit(1)
+    return res
 
 def parse_args() -> tuple[str, str, str]:
     parser: ArgumentParser = ArgumentParser()
