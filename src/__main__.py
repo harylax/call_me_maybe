@@ -4,8 +4,7 @@ from typing import Any
 from src import (
     timer, parse_args, get_vocab, get_inverted_vocab,
     FunctionDef, parse_functions_definition, parse_prompts,
-    function_name_from_llm, params_from_llm, get_function,
-    Prompt
+    function_name_from_llm, params_from_llm, get_function
 )
 from pathlib import Path
 import sys
@@ -46,9 +45,9 @@ def main() -> None:
             'name': llm_fn_name,
             'parameters': llm_params
         })
-        print(f"prompt: {user_prompt.prompt}")
-        print(f"name: {llm_fn_name}")
-        print(f"parameters: {llm_params}")
+        print(f"prompt: {user_prompt.prompt}", flush=True)
+        print(f"name: {llm_fn_name}", flush=True)
+        print(f"parameters: {llm_params}", flush=True)
     path: Path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     try:

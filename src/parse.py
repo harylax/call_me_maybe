@@ -10,18 +10,21 @@ class ParamDef(BaseModel):
 
     type: Literal["string", "number", "integer", "boolean"]
 
+
 class FunctionDef(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    
+
     name: str
     description: str
     parameters: dict[str, ParamDef]
     returns: ParamDef
 
+
 class Prompt(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     prompt: str
+
 
 def _json_load(path: str) -> list[dict[str, Any]]:
     try:
@@ -34,6 +37,7 @@ def _json_load(path: str) -> list[dict[str, Any]]:
         print(f"JSONDecodeError: {err}")
         sys.exit(1)
 
+
 def parse_functions_definition(path: str) -> list[FunctionDef]:
     res: list[FunctionDef] = []
     for func in _json_load(path):
@@ -45,6 +49,7 @@ def parse_functions_definition(path: str) -> list[FunctionDef]:
             sys.exit(1)
     return res
 
+
 def parse_prompts(path: str) -> list[Prompt]:
     res: list[Prompt] = []
     for prompt in _json_load(path):
@@ -55,6 +60,7 @@ def parse_prompts(path: str) -> list[Prompt]:
                 print(f"ValidationError: {error['msg']}", file=sys.stderr)
             sys.exit(1)
     return res
+
 
 def parse_args() -> tuple[str, str, str]:
     parser: ArgumentParser = ArgumentParser()
